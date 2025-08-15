@@ -1,0 +1,100 @@
+@page "/"
+@using AccountSalesApp.WebApp.Models
+@inject AppDataService DataService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Customers</PageTitle>
+
+<h1>Customers</h1>
+
+<button class="btn btn-primary mb-3" @onclick="() => _showAddCustomerModal = true">Add New Customer</button>
+
+@if (_customers == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var customer in _customers)
+            {
+                <tr>
+                    <td>@customer.Name</td>
+                    <td>@customer.Email</td>
+                    <td>@customer.PhoneNumber</td>
+                    <td>
+                        <button class="btn btn-sm btn-info" @onclick='() => ViewCustomer(customer.Id)'>View/Add Sale</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (_showAddCustomerModal)
+{
+    <div class="modal fade show" style="display:block" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Customer</h5>
+                    <button type="button" class="btn-close" @onclick="() => _showAddCustomerModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="_newCustomer" OnValidSubmit="HandleAddCustomer">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label">Name</label>
+                            <InputText class="form-control" @bind-Value="_newCustomer.Name" />
+                            <ValidationMessage For="@(() => _newCustomer.Name)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <InputText class="form-control" @bind-Value="_newCustomer.Email" />
+                        </div>
+                         <div class="mb-3">
+                            <label class="form-label">Phone</label>
+                            <InputText class="form-control" @bind-Value="_newCustomer.PhoneNumber" />
+                        </div>
+                        <button type="submit" class="btn btn-success">Save</button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+
+@code {
+    private List<Customer>? _customers;
+    private Customer _newCustomer = new();
+    private bool _showAddCustomerModal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _customers = await DataService.GetCustomersAsync();
+    }
+
+    private async Task HandleAddCustomer()
+    {
+        await DataService.AddCustomerAsync(_newCustomer);
+        _newCustomer = new(); // Reset form
+        _showAddCustomerModal = false;
+        _customers = await DataService.GetCustomersAsync(); // Refresh list
+    }
+    
+    private void ViewCustomer(int customerId)
+    {
+        NavigationManager.NavigateTo($"/customer/{customerId}");
+    }
+}
