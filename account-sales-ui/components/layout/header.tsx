@@ -12,11 +12,13 @@ import { HelpModal } from '../modals/help-modal'
 import { NotificationsDropdown } from '../dropdowns/notifications-dropdown'
 import { useProfile } from '@/contexts/profile-context'
 import { useNotifications } from '@/contexts/notifications-context'
+import { useAuth } from '@/contexts/auth-context'
 
 export function Header() {
   const router = useRouter()
   const { profilePhoto } = useProfile()
   const { unreadCount } = useNotifications()
+  const { user, logout } = useAuth()
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [showSettingsModal, setShowSettingsModal] = useState(false)
@@ -44,17 +46,9 @@ export function Header() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const handleSignOut = () => {
-    // Clear any stored authentication data
-    localStorage.removeItem('user-session')
-    localStorage.removeItem('app-settings')
-    
     // Show confirmation
     if (confirm('Are you sure you want to sign out?')) {
-      // In a real app, you would call your logout API here
-      console.log('User signed out')
-      
-      // Redirect to login page (for now, just reload)
-      window.location.reload()
+      logout()
     }
   }
 
@@ -147,7 +141,7 @@ export function Header() {
                 )}
               </div>
               <span className="hidden md:block text-sm font-medium text-gray-700">
-                Admin User
+                {user?.name || 'Admin User'}
               </span>
             </Button>
 

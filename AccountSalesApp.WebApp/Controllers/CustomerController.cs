@@ -17,22 +17,48 @@ public class CustomersController : ControllerBase
 
     // GET: /api/customers
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<Customer>>> GetCustomers()
+    public async Task<ActionResult<IEnumerable<object>>> GetCustomers()
     {
         var customers = await _dataService.GetCustomersAsync();
-        return Ok(customers);
+        
+        // Return clean DTOs to avoid circular references
+        var responseDtos = customers.Select(customer => new
+        {
+            id = customer.Id,
+            name = customer.Name,
+            email = customer.Email,
+            phoneNumber = customer.PhoneNumber,
+            dateCreated = customer.DateCreated,
+            status = customer.Status,
+            totalSpent = customer.TotalSpent
+        });
+        
+        return Ok(responseDtos);
     }
 
     // GET: /api/customers/5
     [HttpGet("{id}")]
-    public async Task<ActionResult<Customer>> GetCustomer(int id)
+    public async Task<ActionResult<object>> GetCustomer(int id)
     {
         var customer = await _dataService.GetCustomerByIdAsync(id);
         if (customer == null)
         {
             return NotFound();
         }
-        return Ok(customer);
+        
+        // Return clean DTO to avoid circular references
+        var responseDto = new
+        {
+            id = customer.Id,
+            name = customer.Name,
+            email = customer.Email,
+            phoneNumber = customer.PhoneNumber,
+            dateCreated = customer.DateCreated,
+            status = customer.Status,
+            totalSpent = customer.TotalSpent
+        };
+        
+        return Ok(responseDto);
     }
 
     // POST: /api/customers
@@ -81,9 +107,20 @@ public class CustomersController : ControllerBase
 
     // GET: /api/customers/5/sales
     [HttpGet("{id}/sales")]
-    public async Task<ActionResult<IEnumerable<Sale>>> GetCustomerSales(int id)
+    public async Task<ActionResult<IEnumerable<object>>> GetCustomerSales(int id)
     {
         var sales = await _dataService.GetSalesByCustomerAsync(id);
-        return Ok(sales);
+        
+        // Return clean DTOs to avoid circular references
+        var responseDtos = sales.Select(sale => new
+        {
+            id = sale.Id,
+            customerId = sale.CustomerId,
+            amount = sale.Amount,
+            saleDate = sale.SaleDate,
+            description = sale.Description
+        });
+        
+        return Ok(responseDtos);
     }
 }

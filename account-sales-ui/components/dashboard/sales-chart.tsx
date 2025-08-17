@@ -3,22 +3,56 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 
-const data = [
-  { month: 'Jan', sales: 4000, revenue: 2400 },
-  { month: 'Feb', sales: 3000, revenue: 1398 },
-  { month: 'Mar', sales: 2000, revenue: 9800 },
-  { month: 'Apr', sales: 2780, revenue: 3908 },
-  { month: 'May', sales: 1890, revenue: 4800 },
-  { month: 'Jun', sales: 2390, revenue: 3800 },
-  { month: 'Jul', sales: 3490, revenue: 4300 },
-  { month: 'Aug', sales: 4000, revenue: 2400 },
-  { month: 'Sep', sales: 3000, revenue: 1398 },
-  { month: 'Oct', sales: 2000, revenue: 9800 },
-  { month: 'Nov', sales: 2780, revenue: 3908 },
-  { month: 'Dec', sales: 1890, revenue: 4800 },
-]
+interface SalesChartProps {
+  sales?: any[]
+}
 
-export function SalesChart() {
+export function SalesChart({ sales = [] }: SalesChartProps) {
+  // Process sales data to create chart data
+  const processChartData = () => {
+    if (!sales || sales.length === 0) {
+      // Return default data if no sales
+      return [
+        { month: 'Jan', sales: 0, revenue: 0 },
+        { month: 'Feb', sales: 0, revenue: 0 },
+        { month: 'Mar', sales: 0, revenue: 0 },
+        { month: 'Apr', sales: 0, revenue: 0 },
+        { month: 'May', sales: 0, revenue: 0 },
+        { month: 'Jun', sales: 0, revenue: 0 },
+        { month: 'Jul', sales: 0, revenue: 0 },
+        { month: 'Aug', sales: 0, revenue: 0 },
+        { month: 'Sep', sales: 0, revenue: 0 },
+        { month: 'Oct', sales: 0, revenue: 0 },
+        { month: 'Nov', sales: 0, revenue: 0 },
+        { month: 'Dec', sales: 0, revenue: 0 },
+      ]
+    }
+
+    // Group sales by month
+    const monthlyData: { [key: string]: { sales: number; revenue: number } } = {}
+    
+    sales.forEach(sale => {
+      const date = new Date(sale.saleDate || sale.dateCreated)
+      const month = date.toLocaleString('default', { month: 'short' })
+      
+      if (!monthlyData[month]) {
+        monthlyData[month] = { sales: 0, revenue: 0 }
+      }
+      
+      monthlyData[month].sales += 1
+      monthlyData[month].revenue += sale.amount || 0
+    })
+
+    // Convert to array format for chart
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    return months.map(month => ({
+      month,
+      sales: monthlyData[month]?.sales || 0,
+      revenue: monthlyData[month]?.revenue || 0
+    }))
+  }
+
+  const chartData = processChartData()
   return (
     <Card className="col-span-4">
       <CardHeader>
@@ -26,7 +60,7 @@ export function SalesChart() {
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
-          <AreaChart data={data}>
+          <AreaChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis dataKey="month" />
             <YAxis />

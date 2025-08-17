@@ -79,7 +79,7 @@ export function ViewCustomerModal({ isOpen, onClose, customer }: ViewCustomerMod
             </div>
 
             {/* Sales History */}
-            {customer.sales && customer.sales.length > 0 && (
+            {customer.sales && Array.isArray(customer.sales) && customer.sales.length > 0 && (
               <div className="mt-4">
                 <h4 className="text-sm font-medium text-gray-700 mb-2">Sales History</h4>
                 <div className="space-y-2 max-h-32 overflow-y-auto">

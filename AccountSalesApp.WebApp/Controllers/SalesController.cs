@@ -66,4 +66,28 @@ public class SalesController : ControllerBase
         await _dataService.DeleteSaleAsync(id);
         return NoContent();
     }
+
+    // GET: /api/sales/export
+    [HttpGet("export")]
+    public async Task<IActionResult> ExportSales()
+    {
+        var sales = await _dataService.GetAllSalesAsync();
+        var customers = await _dataService.GetCustomersAsync();
+        
+        // Create a lookup for customer names
+        var customerLookup = customers.ToDictionary(c => c.Id, c => c);
+        
+        // Create CSV content
+        var csvContent = new System.Text.StringBuilder();
+        csvContent.AppendLine("Sale ID,Customer,Amount,Description,Date,Customer Email");
+        
+        foreach (var sale in sales)
+        {
+            var customer = customerLookup.ContainsKey(sale.CustomerId) ? customerLookup[sale.CustomerId] : null;
+            csvContent.AppendLine($"{sale.Id},\"{customer?.Name ?? "Unknown Customer"}\",{sale.Amount},\"{sale.Description}\",{sale.SaleDate:yyyy-MM-dd},\"{customer?.Email ?? "No email"}\"");
+        }
+        
+        var bytes = System.Text.Encoding.UTF8.GetBytes(csvContent.ToString());
+        return File(bytes, "text/csv", $"sales-export-{DateTime.Now:yyyy-MM-dd}.csv");
+    }
 }

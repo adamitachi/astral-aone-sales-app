@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Header } from "@/components/layout/header";
 import { ProfileProvider } from "@/contexts/profile-context";
 import { NotificationsProvider } from "@/contexts/notifications-context";
+import { AuthProvider } from "@/contexts/auth-context";
+import { ThemeProvider } from "@/contexts/theme-context";
+import { DashboardProvider } from "@/contexts/dashboard-context";
+import { AppLayout } from "@/components/layout/app-layout";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,19 +54,19 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
       >
-        <ProfileProvider>
-          <NotificationsProvider>
-            <div className="flex h-screen">
-              <Sidebar />
-              <div className="flex-1 flex flex-col overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto">
-                  {children}
-                </main>
-              </div>
-            </div>
-          </NotificationsProvider>
-        </ProfileProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <ProfileProvider>
+              <NotificationsProvider>
+                <DashboardProvider>
+                  <AppLayout>
+                    {children}
+                  </AppLayout>
+                </DashboardProvider>
+              </NotificationsProvider>
+            </ProfileProvider>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

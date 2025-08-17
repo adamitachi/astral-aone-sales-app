@@ -115,7 +115,16 @@ export default function InvoicesPage() {
       const response = await fetch('http://localhost:5086/api/invoice');
       if (response.ok) {
         const data = await response.json();
-        setInvoices(data);
+        // Check if data has the expected structure
+        if (Array.isArray(data)) {
+          setInvoices(data);
+        } else if (data && data.$values && Array.isArray(data.$values)) {
+          // Handle the old format with $values
+          setInvoices(data.$values);
+        } else {
+          console.error('Unexpected invoices data format:', data);
+          setInvoices([]);
+        }
       } else {
         throw new Error('Failed to fetch invoices');
       }
@@ -126,18 +135,32 @@ export default function InvoicesPage() {
         description: 'Failed to fetch invoices',
         variant: 'destructive'
       });
+      setInvoices([]);
     }
   };
 
   const fetchCustomers = async () => {
     try {
-      const response = await fetch('http://localhost:5086/api/customer');
+      const response = await fetch('http://localhost:5086/api/customers');
       if (response.ok) {
         const data = await response.json();
-        setCustomers(data);
+        // Check if data has the expected structure
+        if (Array.isArray(data)) {
+          setCustomers(data);
+        } else if (data && data.$values && Array.isArray(data.$values)) {
+          // Handle the old format with $values
+          setCustomers(data.$values);
+        } else {
+          console.error('Unexpected customers data format:', data);
+          setCustomers([]);
+        }
+      } else {
+        console.error('Failed to fetch customers, status:', response.status);
+        setCustomers([]);
       }
     } catch (error) {
       console.error('Error fetching customers:', error);
+      setCustomers([]);
     }
   };
 
@@ -156,43 +179,36 @@ export default function InvoicesPage() {
   };
 
   // Filter invoices
-  const filteredInvoices = invoices.filter(invoice => {
+  const filteredInvoices = invoices && Array.isArray(invoices) ? invoices.filter(invoice => {
     const matchesSearch = invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         invoice.customer.name.toLowerCase().includes(searchTerm.toLowerCase());
+                         invoice.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false;
     const matchesStatus = statusFilter === 'all' || invoice.status.toLowerCase() === statusFilter.toLowerCase();
     const matchesCustomer = customerFilter === 'all' || invoice.customerId.toString() === customerFilter;
     
     return matchesSearch && matchesStatus && matchesCustomer;
-  });
+  }) : [];
 
   const handleCreateInvoice = async (invoiceData: any) => {
-    try {
-      const response = await fetch('http://localhost:5086/api/invoice', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(invoiceData),
-      });
+    console.log('Sending invoice data to API:', invoiceData);
+    
+    const response = await fetch('http://localhost:5086/api/invoice', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(invoiceData),
+    });
 
-      if (response.ok) {
-        toast({
-          title: 'Success',
-          description: 'Invoice created successfully',
-        });
-        fetchInvoices();
-        fetchStatistics();
-        setIsCreateModalOpen(false);
-      } else {
-        throw new Error('Failed to create invoice');
-      }
-    } catch (error) {
-      console.error('Error creating invoice:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create invoice',
-        variant: 'destructive'
-      });
+    console.log('API Response status:', response.status);
+
+    if (response.ok) {
+      fetchInvoices();
+      fetchStatistics();
+      setIsCreateModalOpen(false);
+    } else {
+      const errorData = await response.text();
+      console.error('API Error response:', errorData);
+      throw new Error(`Failed to create invoice: ${response.status} - ${errorData}`);
     }
   };
 
@@ -426,11 +442,13 @@ export default function InvoicesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Customers</SelectItem>
-                {customers.map((customer) => (
+                {customers && customers.length > 0 ? customers.map((customer) => (
                   <SelectItem key={customer.id} value={customer.id.toString()}>
                     {customer.name}
                   </SelectItem>
-                ))}
+                )) : (
+                  <SelectItem value="no-customers" disabled>No customers available</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -458,10 +476,10 @@ export default function InvoicesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredInvoices.map((invoice) => (
+              {filteredInvoices && filteredInvoices.length > 0 ? filteredInvoices.map((invoice) => (
                 <TableRow key={invoice.id}>
                   <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                  <TableCell>{invoice.customer.name}</TableCell>
+                  <TableCell>{invoice.customer?.name || 'Unknown Customer'}</TableCell>
                   <TableCell>{formatDate(invoice.invoiceDate)}</TableCell>
                   <TableCell>{formatDate(invoice.dueDate)}</TableCell>
                   <TableCell>
@@ -512,11 +530,17 @@ export default function InvoicesPage() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                    No invoices available
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
 
-          {filteredInvoices.length === 0 && (
+          {(!filteredInvoices || filteredInvoices.length === 0) && (
             <div className="text-center py-8 text-gray-500">
               No invoices found matching your criteria.
             </div>
@@ -529,7 +553,7 @@ export default function InvoicesPage() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onCreateInvoice={handleCreateInvoice}
-        customers={customers}
+        customers={customers || []}
       />
 
       {selectedInvoice && (
@@ -545,7 +569,7 @@ export default function InvoicesPage() {
             onClose={() => setIsEditModalOpen(false)}
             onEditInvoice={handleEditInvoice}
             invoice={selectedInvoice}
-            customers={customers}
+            customers={customers || []}
           />
 
           <AddPaymentModal

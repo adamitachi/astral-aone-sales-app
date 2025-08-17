@@ -1,0 +1,22 @@
+{
+  // Auto-save settings
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  
+  // Git settings for better GitHub sync
+  "git.enableSmartCommit": true,
+  "git.autofetch": true,
+  "git.autofetchPeriod": 180,
+  "git.confirmSync": false,
+  "git.enableCommitSigning": false,
+  
+  // Source control settings
+  "scm.diffDecorations": "all",
+  "scm.alwaysShowProviders": true,
+  "scm.autoReveal": true,
+  
+  // GitHub integration
+  "github.copilot.enable": {
+    "*": true
+  }
+}

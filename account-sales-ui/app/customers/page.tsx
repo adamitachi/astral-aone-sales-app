@@ -141,7 +141,12 @@ export default function CustomersPage() {
           throw new Error('Failed to fetch data');
         }
         const data = await response.json();
-        setCustomers(data);
+        
+        // Handle different data formats and ensure arrays (same as Sales page)
+        const processedCustomers = Array.isArray(data) ? data : 
+          (data && data.$values && Array.isArray(data.$values)) ? data.$values : [];
+        
+        setCustomers(processedCustomers);
         setBackendStatus('connected');
       } catch (error) {
         console.error('Backend connection failed:', error);
@@ -156,12 +161,12 @@ export default function CustomersPage() {
     fetchCustomers();
   }, []);
 
-  const filteredCustomers = customers.filter(customer => {
+  const filteredCustomers = Array.isArray(customers) ? customers.filter(customer => {
     const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesFilter = filterStatus === 'all' || customer.status === filterStatus;
     return matchesSearch && matchesFilter;
-  });
+  }) : [];
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -213,19 +218,19 @@ export default function CustomersPage() {
       } else {
         // Add to local state when backend is not available
         const newSale: Sale = {
-          id: Math.max(...customers.flatMap(c => c.sales).map(s => s.id)) + 1,
+          id: Array.isArray(customers) && customers.length > 0 ? Math.max(...customers.flatMap(c => c.sales || []).map(s => s.id), 0) + 1 : 1,
           ...saleData
         };
         
-        setCustomers(prev => prev.map(c => 
+        setCustomers(prev => Array.isArray(prev) ? prev.map(c => 
           c.id === saleData.customerId 
             ? { 
                 ...c, 
-                sales: [...c.sales, newSale],
+                sales: [...(c.sales || []), newSale],
                 totalSpent: (c.totalSpent || 0) + saleData.amount
               }
             : c
-        ));
+        ) : []);
         addToast('Sale added successfully!', 'success');
       }
     } catch (error) {
@@ -250,18 +255,18 @@ export default function CustomersPage() {
         });
 
         if (response.ok) {
-          setCustomers(prev => prev.filter(c => c.id !== customer.id));
+          setCustomers(prev => Array.isArray(prev) ? prev.filter(c => c.id !== customer.id) : []);
         } else {
           throw new Error('Failed to delete customer from backend');
         }
       } else {
         // Remove from local state when backend is not available
-        setCustomers(prev => prev.filter(c => c.id !== customer.id));
+        setCustomers(prev => Array.isArray(prev) ? prev.filter(c => c.id !== customer.id) : []);
       }
     } catch (error) {
       console.error('Failed to delete customer:', error);
       // Fallback: remove from local state
-      setCustomers(prev => prev.filter(c => c.id !== customer.id));
+      setCustomers(prev => Array.isArray(prev) ? prev.filter(c => c.id !== customer.id) : []);
     }
   };
 
@@ -279,18 +284,18 @@ export default function CustomersPage() {
 
         if (response.ok) {
           const updatedCustomer = await response.json();
-          setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updatedCustomer } : c));
+          setCustomers(prev => Array.isArray(prev) ? prev.map(c => c.id === id ? { ...c, ...updatedCustomer } : c) : []);
         } else {
           throw new Error('Failed to update customer in backend');
         }
       } else {
         // Update in local state when backend is not available
-        setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...customerData } : c));
+        setCustomers(prev => Array.isArray(prev) ? prev.map(c => c.id === id ? { ...c, ...customerData } : c) : []);
       }
     } catch (error) {
       console.error('Failed to update customer:', error);
       // Fallback: update in local state
-      setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...customerData } : c));
+      setCustomers(prev => Array.isArray(prev) ? prev.map(c => c.id === id ? { ...c, ...customerData } : c) : []);
     }
   };
 
@@ -320,12 +325,12 @@ export default function CustomersPage() {
 
         if (response.ok) {
           const newCustomer = await response.json();
-          setCustomers(prev => [...prev, {
+          setCustomers(prev => Array.isArray(prev) ? [...prev, {
             ...newCustomer,
             status: 'active',
             sales: [],
             totalSpent: 0
-          }]);
+          }] : [newCustomer]);
           addToast('Customer added successfully!', 'success');
         } else {
           throw new Error('Failed to add customer to backend');
@@ -333,28 +338,28 @@ export default function CustomersPage() {
       } else {
         // Add to local state when backend is not available
         const newCustomer: Customer = {
-          id: Math.max(...customers.map(c => c.id)) + 1,
+          id: Array.isArray(customers) && customers.length > 0 ? Math.max(...customers.map(c => c.id), 0) + 1 : 1,
           ...customerData,
           dateCreated: new Date().toISOString(),
           sales: [],
           status: 'active',
           totalSpent: 0
         };
-        setCustomers(prev => [...prev, newCustomer]);
+        setCustomers(prev => Array.isArray(prev) ? [...prev, newCustomer] : [newCustomer]);
         addToast('Customer added successfully!', 'success');
       }
     } catch (error) {
       console.error('Failed to add customer:', error);
       // Fallback: add to local state
       const newCustomer: Customer = {
-        id: Math.max(...customers.map(c => c.id)) + 1,
+        id: Array.isArray(customers) && customers.length > 0 ? Math.max(...customers.map(c => c.id), 0) + 1 : 1,
         ...customerData,
         dateCreated: new Date().toISOString(),
         sales: [],
         status: 'active',
         totalSpent: 0
       };
-      setCustomers(prev => [...prev, newCustomer]);
+      setCustomers(prev => Array.isArray(prev) ? [...prev, newCustomer] : [newCustomer]);
     }
   };
 
@@ -450,7 +455,7 @@ export default function CustomersPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCustomers.map((customer) => (
+                  {Array.isArray(filteredCustomers) && filteredCustomers.length > 0 ? filteredCustomers.map((customer) => (
                     <tr key={customer.id} className="border-b border-gray-100 hover:bg-gray-50">
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-3">
@@ -521,7 +526,13 @@ export default function CustomersPage() {
                           </div>
                         </td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan={6} className="py-8 px-4 text-center text-gray-500">
+                        No customers available
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

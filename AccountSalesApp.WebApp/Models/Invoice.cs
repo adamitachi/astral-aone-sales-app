@@ -7,7 +7,6 @@ public class Invoice
 {
     public int Id { get; set; }
     
-    [Required]
     [StringLength(50)]
     public string InvoiceNumber { get; set; } = string.Empty;
     

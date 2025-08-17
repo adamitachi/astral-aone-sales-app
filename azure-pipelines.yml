@@ -1,0 +1,143 @@
+trigger:
+  - main
+
+variables:
+  solution: '**/*.sln'
+  buildPlatform: 'Any CPU'
+  buildConfiguration: 'Release'
+  dotNetVersion: '8.0.x'
+  nodeVersion: '18.x'
+
+stages:
+- stage: Build
+  displayName: 'Build Application'
+  jobs:
+  - job: BuildBackend
+    displayName: 'Build .NET Backend'
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        version: '$(dotNetVersion)'
+        includePreviewVersions: false
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore NuGet packages'
+      inputs:
+        command: 'restore'
+        projects: '$(solution)'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Build solution'
+      inputs:
+        command: 'build'
+        projects: '$(solution)'
+        arguments: '--configuration $(buildConfiguration) --no-restore'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish backend'
+      inputs:
+        command: 'publish'
+        publishWebProjects: false
+        projects: 'AccountSalesApp.WebApp/AccountSalesApp.WebApp.csproj'
+        arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/backend --no-build'
+        zipAfterPublish: true
+    
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish backend artifacts'
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/backend'
+        artifactName: 'backend'
+
+  - job: BuildFrontend
+    displayName: 'Build Next.js Frontend'
+    pool:
+      vmImage: 'ubuntu-latest'
+    
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '$(nodeVersion)'
+      displayName: 'Install Node.js'
+    
+    - task: Cache@2
+      inputs:
+        key: 'npm | "$(Agent.OS)" | package-lock.json'
+        restoreKeys: |
+          npm | "$(Agent.OS)"
+        path: $(npm_config_cache)
+      displayName: 'Cache npm packages'
+    
+    - script: |
+        cd account-sales-ui
+        npm ci
+      displayName: 'Install dependencies'
+    
+    - script: |
+        cd account-sales-ui
+        npm run build:prod
+      displayName: 'Build Next.js app for production'
+    
+    - task: ArchiveFiles@2
+      displayName: 'Archive frontend build'
+      inputs:
+        rootFolderOrFile: 'account-sales-ui/.next'
+        includeRootFolder: false
+        archiveType: 'zip'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/frontend.zip'
+    
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish frontend artifacts'
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/frontend.zip'
+        artifactName: 'frontend'
+
+- stage: Deploy
+  displayName: 'Deploy to Azure'
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployBackend
+    displayName: 'Deploy Backend to Azure App Service'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@1
+            inputs:
+              buildType: 'current'
+              artifactName: 'backend'
+              downloadPath: '$(System.ArtifactsDirectory)'
+          
+          - task: AzureWebApp@1
+            inputs:
+              azureSubscription: 'Your-Azure-Subscription-Connection'
+              appName: 'astral-aone-backend'
+              package: '$(System.ArtifactsDirectory)/backend/*.zip'
+              appType: 'webApp'
+              deploymentMethod: 'auto'
+
+  - deployment: DeployFrontend
+    displayName: 'Deploy Frontend to Azure Static Web Apps'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadBuildArtifacts@1
+            inputs:
+              buildType: 'current'
+              artifactName: 'frontend'
+              downloadPath: '$(System.ArtifactsDirectory)'
+          
+          - task: AzureStaticWebApp@0
+            inputs:
+              app_location: '/'
+              api_location: ''
+              output_location: '.next'
+              skip_app_build: true
+              package_path: '$(System.ArtifactsDirectory)/frontend.zip'
+              azure_static_web_apps_api_token: '$(AZURE_STATIC_WEB_APPS_API_TOKEN)'

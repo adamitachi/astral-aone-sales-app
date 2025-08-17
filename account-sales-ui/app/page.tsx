@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { MetricsCard } from '@/components/dashboard/metrics-card'
 import { SalesChart } from '@/components/dashboard/sales-chart'
 import { RecentActivity } from '@/components/dashboard/recent-activity'
@@ -13,12 +13,16 @@ import {
   Calendar,
   ArrowUpRight,
   ArrowDownRight,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  BarChart3
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/ui/logo'
 import { useRouter } from 'next/navigation'
+import { useDashboard } from '@/contexts/dashboard-context'
+import { RefreshCw } from 'lucide-react'
 
 // Define a TypeScript type for our Customer to match the backend
 type Customer = {
@@ -60,50 +64,138 @@ const fallbackCustomers: Customer[] = [
 
 export default function Dashboard() {
   const router = useRouter();
+  const { settings, lastRefresh, refreshData } = useDashboard();
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [sales, setSales] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [backendStatus, setBackendStatus] = useState<'connected' | 'disconnected' | 'loading'>('loading');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
+  const quickActionsRef = useRef<HTMLDivElement>(null);
 
-  // This hook runs once when the component loads
+  // This hook runs when the component loads and when refresh interval changes
   useEffect(() => {
-    const fetchCustomers = async () => {
+    const fetchData = async () => {
       try {
-        // This is the API call to our running .NET backend!
-        const response = await fetch('http://localhost:5086/api/customers');
-        if (!response.ok) {
+        // Fetch customers and sales data
+        const [customersResponse, salesResponse] = await Promise.all([
+          fetch('http://localhost:5086/api/customers'),
+          fetch('http://localhost:5086/api/sales')
+        ]);
+
+        if (customersResponse.ok && salesResponse.ok) {
+          const customersData = await customersResponse.json();
+          const salesData = await salesResponse.json();
+          
+          setCustomers(customersData);
+          setSales(salesData);
+          setBackendStatus('connected');
+        } else {
           throw new Error('Failed to fetch data');
         }
-        const data = await response.json();
-        setCustomers(data);
-        setBackendStatus('connected');
       } catch (error) {
         console.error('Backend connection failed:', error);
         // Use fallback data when backend is not available
         setCustomers(fallbackCustomers);
+        setSales([]);
         setBackendStatus('disconnected');
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchCustomers();
-  }, []); // The empty array [] means this effect runs only once
+    fetchData();
+  }, [lastRefresh]); // Re-fetch when lastRefresh changes (auto-refresh)
 
-  // Mock data for demonstration - in real app this would come from API
+  // Calculate real dashboard data from fetched data
   const dashboardData = {
-    totalRevenue: 125000,
-    totalCustomers: customers.length || 0,
-    totalSales: 1247,
-    conversionRate: 3.2,
-    monthlyGrowth: 12.5,
-    customerGrowth: 8.2,
-    salesGrowth: 15.3,
-    revenueGrowth: 22.1
+    totalRevenue: sales?.reduce((sum, sale) => sum + (sale.amount || 0), 0) || 0,
+    totalCustomers: customers?.length || 0,
+    totalSales: sales?.length || 0,
+    conversionRate: customers?.length > 0 ? ((sales?.length || 0) / customers.length * 100) : 0,
+    monthlyGrowth: 12.5, // This would need historical data to calculate
+    customerGrowth: 8.2, // This would need historical data to calculate
+    salesGrowth: 15.3, // This would need historical data to calculate
+    revenueGrowth: 22.1 // This would need historical data to calculate
   };
+
+  // Filter sales for selected date
+  const todaySales = sales?.filter(sale => {
+    const saleDate = new Date(sale.saleDate || sale.dateCreated);
+    return saleDate.toDateString() === selectedDate.toDateString();
+  }) || [];
+
+  const todayRevenue = todaySales.reduce((sum, sale) => sum + (sale.amount || 0), 0);
+
+  // Quick Actions functions
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case 'new-sale':
+        router.push('/sales');
+        break;
+      case 'new-customer':
+        router.push('/customers');
+        break;
+      case 'new-invoice':
+        router.push('/invoices');
+        break;
+      case 'view-reports':
+        router.push('/reports');
+        break;
+      default:
+        break;
+    }
+    setIsQuickActionsOpen(false);
+  };
+
+  // Handle click outside to close Quick Actions
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (quickActionsRef.current && !quickActionsRef.current.contains(event.target as Node)) {
+        setIsQuickActionsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="p-6 space-y-6">
       {/* Backend Status Alert */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+            backendStatus === 'connected' 
+              ? 'bg-green-100 text-green-800' 
+              : backendStatus === 'disconnected' 
+              ? 'bg-red-100 text-red-800' 
+              : 'bg-yellow-100 text-yellow-800'
+          }`}>
+            {backendStatus === 'connected' ? '🟢 Connected' : 
+             backendStatus === 'disconnected' ? '🔴 Disconnected' : '🟡 Loading...'}
+          </div>
+          {settings.refreshInterval > 0 && (
+            <div className="text-sm text-gray-600">
+              Auto-refresh: {settings.refreshInterval} seconds
+            </div>
+          )}
+        </div>
+        <div className="flex items-center space-x-3">
+          <div className="text-sm text-gray-500">
+            Last updated: {lastRefresh.toLocaleTimeString()}
+          </div>
+          <button
+            onClick={refreshData}
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Refresh data"
+          >
+            <RefreshCw className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
       {backendStatus === 'disconnected' && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-center space-x-3">
@@ -131,54 +223,141 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline">
+          <Button 
+            variant="outline" 
+            onClick={() => setSelectedDate(new Date())}
+            className={selectedDate.toDateString() === new Date().toDateString() ? 'bg-blue-50 border-blue-200 text-blue-700' : ''}
+          >
             <Calendar className="h-4 w-4 mr-2" />
             Today
           </Button>
-          <Button>
+          <Button onClick={() => setIsQuickActionsOpen(!isQuickActionsOpen)}>
             <ArrowUpRight className="h-4 w-4 mr-2" />
             Quick Actions
           </Button>
         </div>
+        
+        {/* Quick Actions Dropdown */}
+        {isQuickActionsOpen && (
+          <div ref={quickActionsRef} className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+            <div className="p-2">
+              <div className="text-sm font-medium text-gray-700 mb-2 px-2">Quick Actions</div>
+              <div className="space-y-1">
+                <button
+                  onClick={() => handleQuickAction('new-sale')}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center space-x-2"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  <span>Create New Sale</span>
+                </button>
+                <button
+                  onClick={() => handleQuickAction('new-customer')}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center space-x-2"
+                >
+                  <Users className="h-4 w-4" />
+                  <span>Add New Customer</span>
+                </button>
+                <button
+                  onClick={() => handleQuickAction('new-invoice')}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center space-x-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>Create Invoice</span>
+                </button>
+                <button
+                  onClick={() => handleQuickAction('view-reports')}
+                  className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center space-x-2"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  <span>View Reports</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Today's Summary */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-medium text-blue-900">
+              {selectedDate.toDateString() === new Date().toDateString() ? "Today's Summary" : `Summary for ${selectedDate.toLocaleDateString()}`}
+            </h3>
+            <p className="text-sm text-blue-700">
+              {isLoading ? 'Loading...' : `${todaySales.length} sales • $${todayRevenue.toLocaleString()} revenue`}
+            </p>
+          </div>
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setSelectedDate(new Date(selectedDate.getTime() - 24 * 60 * 60 * 1000))}
+              disabled={isLoading}
+            >
+              Previous Day
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setSelectedDate(new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000))}
+              disabled={isLoading}
+            >
+              Next Day
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricsCard
-          title="Total Revenue"
-          value={`$${dashboardData.totalRevenue.toLocaleString()}`}
-          change={dashboardData.revenueGrowth}
-          changeLabel="last month"
-          icon={<DollarSign className="h-4 w-4" />}
-        />
-        <MetricsCard
-          title="Total Customers"
-          value={dashboardData.totalCustomers.toLocaleString()}
-          change={dashboardData.customerGrowth}
-          changeLabel="last month"
-          icon={<Users className="h-4 w-4" />}
-        />
-        <MetricsCard
-          title="Total Sales"
-          value={dashboardData.totalSales.toLocaleString()}
-          change={dashboardData.salesGrowth}
-          changeLabel="last month"
-          icon={<ShoppingCart className="h-4 w-4" />}
-        />
-        <MetricsCard
-          title="Conversion Rate"
-          value={`${dashboardData.conversionRate}%`}
-          change={2.1}
-          changeLabel="last month"
-          icon={<Target className="h-4 w-4" />}
-        />
-      </div>
+      {settings.showMetrics ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <MetricsCard
+            title="Total Revenue"
+            value={`$${dashboardData.totalRevenue.toLocaleString()}`}
+            change={dashboardData.revenueGrowth}
+            changeLabel="last month"
+            icon={<DollarSign className="h-4 w-4" />}
+          />
+          <MetricsCard
+            title="Total Customers"
+            value={dashboardData.totalCustomers.toLocaleString()}
+            change={dashboardData.customerGrowth}
+            changeLabel="last month"
+            icon={<Users className="h-4 w-4" />}
+          />
+          <MetricsCard
+            title="Total Sales"
+            value={dashboardData.totalSales.toLocaleString()}
+            change={dashboardData.salesGrowth}
+            changeLabel="last month"
+            icon={<ShoppingCart className="h-4 w-4" />}
+          />
+          <MetricsCard
+            title="Conversion Rate"
+            value={`${dashboardData.conversionRate}%`}
+            change={2.1}
+            changeLabel="last month"
+            icon={<Target className="h-4 w-4" />}
+          />
+        </div>
+      ) : (
+        <div className="text-center py-8 text-gray-500">
+          Metrics are currently hidden. Enable them in Settings → App Preferences → Dashboard Preferences.
+        </div>
+      )}
 
       {/* Charts and Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <SalesChart />
-        <RecentActivity />
-      </div>
+      {settings.showCharts ? (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <SalesChart sales={sales} />
+          <RecentActivity sales={sales} />
+        </div>
+      ) : (
+        <div className="text-center py-8 text-gray-500">
+          Charts are currently hidden. Enable them in Settings → App Preferences → Dashboard Preferences.
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -231,7 +410,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {customers.slice(0, 3).map((customer) => (
+              {isLoading ? (
+                <div className="text-sm text-gray-500">Loading customers...</div>
+              ) : customers && customers.length > 0 ? customers.slice(0, 3).map((customer) => (
                 <div key={customer.id} className="flex items-center space-x-3">
                   <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                     <span className="text-blue-600 text-sm font-medium">
@@ -247,7 +428,9 @@ export default function Dashboard() {
                     </p>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="text-sm text-gray-500">No customers available</div>
+              )}
             </div>
           </CardContent>
         </Card>

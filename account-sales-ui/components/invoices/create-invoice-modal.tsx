@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/components/ui/toast';
 
 interface Customer {
   id: number;
@@ -42,6 +43,8 @@ interface CreateInvoiceModalProps {
 }
 
 export default function CreateInvoiceModal({ isOpen, onClose, onCreateInvoice, customers }: CreateInvoiceModalProps) {
+  const { addToast, ToastContainer } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     customerId: '',
     invoiceDate: new Date().toISOString().split('T')[0],
@@ -138,24 +141,36 @@ export default function CreateInvoiceModal({ isOpen, onClose, onCreateInvoice, c
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (isSubmitting) return;
 
     // Validate required fields
     if (!formData.customerId) {
-      alert('Please select a customer');
+      addToast('Please select a customer', 'error');
       return;
     }
 
     if (items.some(item => !item.description.trim())) {
-      alert('Please fill in all item descriptions');
+      addToast('Please fill in all item descriptions', 'error');
+      return;
+    }
+
+    if (items.some(item => item.quantity <= 0)) {
+      addToast('All items must have a quantity greater than 0', 'error');
+      return;
+    }
+
+    if (items.some(item => item.unitPrice < 0)) {
+      addToast('All items must have a valid unit price', 'error');
       return;
     }
 
     const invoiceData = {
       customerId: parseInt(formData.customerId),
-      invoiceDate: formData.invoiceDate,
-      dueDate: formData.dueDate,
+      invoiceDate: new Date(formData.invoiceDate + 'T12:00:00Z').toISOString(),
+      dueDate: new Date(formData.dueDate + 'T12:00:00Z').toISOString(),
       status: formData.status,
       subTotal: calculateSubTotal(),
       taxRate: formData.taxRate,
@@ -171,7 +186,19 @@ export default function CreateInvoiceModal({ isOpen, onClose, onCreateInvoice, c
       paidAmount: 0
     };
 
-    onCreateInvoice(invoiceData);
+    setIsSubmitting(true);
+    try {
+      console.log('Creating invoice with data:', JSON.stringify(invoiceData, null, 2));
+      await onCreateInvoice(invoiceData);
+      addToast('Invoice created successfully!', 'success');
+      resetForm();
+      onClose();
+    } catch (error) {
+      console.error('Invoice creation error:', error);
+      addToast('Failed to create invoice. Please try again.', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -225,11 +252,13 @@ export default function CreateInvoiceModal({ isOpen, onClose, onCreateInvoice, c
                   <SelectValue placeholder="Select a customer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((customer) => (
+                  {Array.isArray(customers) ? customers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id.toString()}>
                       {customer.name}
                     </SelectItem>
-                  ))}
+                  )) : (
+                    <SelectItem value="no-customers" disabled>No customers available</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -489,15 +518,24 @@ export default function CreateInvoiceModal({ isOpen, onClose, onCreateInvoice, c
                 resetForm();
                 onClose();
               }}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-              Create Invoice
+            <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  <span>Creating...</span>
+                </div>
+              ) : (
+                'Create Invoice'
+              )}
             </Button>
           </div>
         </form>
       </DialogContent>
+      <ToastContainer />
     </Dialog>
   );
 }

@@ -1,11 +1,13 @@
 "use client"
 
 import { useState, useRef, useEffect } from 'react'
-import { X, User, Mail, Phone, MapPin, Calendar, Edit2, Save, Camera, Upload, Trash2 } from 'lucide-react'
+import { X, User, Mail, Phone, MapPin, Calendar, Edit2, Save, Camera, Upload, Trash2, Lock, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Logo } from '@/components/ui/logo'
 import { useProfile } from '@/contexts/profile-context'
+import { useToast } from '@/components/ui/toast'
+import { useAuth } from '@/contexts/auth-context'
 
 interface ProfileModalProps {
   isOpen: boolean
@@ -14,14 +16,17 @@ interface ProfileModalProps {
 
 export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const { profilePhoto, setProfilePhoto } = useProfile()
+  const { addToast, ToastContainer } = useToast()
+  const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [profile, setProfile] = useState({
-    name: 'Admin User',
-    email: 'admin@astralaone.com',
+    name: user?.name || 'Admin User',
+    email: user?.email || 'admin@astralaone.com',
     phone: '+1 (555) 123-4567',
     location: 'Kuala Lumpur, Malaysia',
     joinDate: 'January 2024',
-    role: 'System Administrator',
+    role: user?.role === 'admin' ? 'System Administrator' : 'User',
     department: 'Management',
     lastLogin: '2 hours ago'
   })
@@ -30,6 +35,37 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Password change state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  })
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false)
+
+  // Update profile when user data changes
+  useEffect(() => {
+    if (user) {
+      const updatedProfile = {
+        name: user.name || 'Admin User',
+        email: user.email || 'admin@astralaone.com',
+        phone: '+1 (555) 123-4567',
+        location: 'Kuala Lumpur, Malaysia',
+        joinDate: 'January 2024',
+        role: user.role === 'admin' ? 'System Administrator' : 'User',
+        department: 'Management',
+        lastLogin: '2 hours ago'
+      }
+      setProfile(updatedProfile)
+      setEditedProfile(updatedProfile)
+    }
+  }, [user])
 
   const handleSave = () => {
     setProfile(editedProfile)
@@ -39,6 +75,63 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const handleCancel = () => {
     setEditedProfile(profile)
     setIsEditing(false)
+  }
+
+  const handlePasswordChange = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      addToast('Please fill in all password fields', 'error')
+      return
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      addToast('New passwords do not match', 'error')
+      return
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      addToast('New password must be at least 6 characters', 'error')
+      return
+    }
+
+    if (passwordData.newPassword === passwordData.currentPassword) {
+      addToast('New password must be different from current password', 'error')
+      return
+    }
+
+    setIsSubmittingPassword(true)
+    try {
+      // TODO: Replace with actual API call
+      const response = await fetch('http://localhost:5086/api/auth/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // TODO: Add authorization header with token
+        },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        })
+      })
+
+      if (response.ok) {
+        addToast('Password changed successfully', 'success')
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+        setIsChangingPassword(false)
+      } else {
+        const error = await response.text()
+        addToast(error || 'Failed to change password', 'error')
+      }
+    } catch (error) {
+      console.error('Password change error:', error)
+      addToast('Failed to change password', 'error')
+    } finally {
+      setIsSubmittingPassword(false)
+    }
+  }
+
+  const handleCancelPasswordChange = () => {
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    setIsChangingPassword(false)
   }
 
   const handlePhotoClick = () => {
@@ -316,6 +409,136 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Security Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center justify-between">
+                  <span className="flex items-center">
+                    <Lock className="h-5 w-5 mr-2" />
+                    Security
+                  </span>
+                  {!isChangingPassword && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsChangingPassword(true)}
+                    >
+                      Change Password
+                    </Button>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isChangingPassword ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Current Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          type={showPasswords.current ? "text" : "password"}
+                          value={passwordData.currentPassword}
+                          onChange={(e) => setPasswordData({...passwordData, currentPassword: e.target.value})}
+                          className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter current password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords({...showPasswords, current: !showPasswords.current})}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        New Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          type={showPasswords.new ? "text" : "password"}
+                          value={passwordData.newPassword}
+                          onChange={(e) => setPasswordData({...passwordData, newPassword: e.target.value})}
+                          className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Enter new password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords({...showPasswords, new: !showPasswords.new})}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Must be at least 6 characters</p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Confirm New Password
+                      </label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          type={showPasswords.confirm ? "text" : "password"}
+                          value={passwordData.confirmPassword}
+                          onChange={(e) => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                          className="w-full pl-10 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Confirm new password"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswords({...showPasswords, confirm: !showPasswords.confirm})}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-3 pt-2">
+                      <Button
+                        variant="outline"
+                        onClick={handleCancelPasswordChange}
+                        disabled={isSubmittingPassword}
+                        className="flex-1"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handlePasswordChange}
+                        disabled={isSubmittingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword}
+                        className="flex-1"
+                      >
+                        {isSubmittingPassword ? (
+                          <div className="flex items-center space-x-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            <span>Updating...</span>
+                          </div>
+                        ) : (
+                          'Update Password'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-3">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                    <div className="flex-1">
+                      <label className="block text-sm font-medium text-gray-700">Password</label>
+                      <p className="text-gray-900">••••••••••••</p>
+                      <p className="text-xs text-gray-500 mt-1">Last changed 30 days ago</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Quick Stats */}
@@ -342,6 +565,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           </Card>
         </div>
       </div>
+      <ToastContainer />
     </div>
   )
 }

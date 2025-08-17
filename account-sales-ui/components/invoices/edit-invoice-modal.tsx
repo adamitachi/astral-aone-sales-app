@@ -262,11 +262,13 @@ export default function EditInvoiceModal({ isOpen, onClose, onEditInvoice, invoi
                   <SelectValue placeholder="Select a customer" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((customer) => (
+                  {Array.isArray(customers) ? customers.map((customer) => (
                     <SelectItem key={customer.id} value={customer.id.toString()}>
                       {customer.name}
                     </SelectItem>
-                  ))}
+                  )) : (
+                    <SelectItem value="no-customers" disabled>No customers available</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

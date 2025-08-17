@@ -168,7 +168,7 @@ export default function AddPaymentModal({ isOpen, onClose, onAddPayment, invoice
   };
 
   const getPaymentMethodIcon = (method: string) => {
-    const paymentMethod = paymentMethods.find(pm => pm.value === method);
+    const paymentMethod = Array.isArray(paymentMethods) ? paymentMethods.find(pm => pm.value === method) : null;
     if (paymentMethod) {
       const Icon = paymentMethod.icon;
       return <Icon className="h-4 w-4" />;
@@ -295,14 +295,16 @@ export default function AddPaymentModal({ isOpen, onClose, onAddPayment, invoice
                 <SelectValue placeholder="Select payment method" />
               </SelectTrigger>
               <SelectContent>
-                {paymentMethods.map((method) => (
+                {Array.isArray(paymentMethods) ? paymentMethods.map((method) => (
                   <SelectItem key={method.value} value={method.value}>
                     <div className="flex items-center gap-2">
                       <method.icon className="h-4 w-4" />
                       {method.label}
                     </div>
                   </SelectItem>
-                ))}
+                )) : (
+                  <SelectItem value="no-methods" disabled>No payment methods available</SelectItem>
+                )}
               </SelectContent>
             </Select>
             {errors.paymentMethod && (

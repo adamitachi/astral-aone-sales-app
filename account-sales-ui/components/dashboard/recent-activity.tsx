@@ -12,83 +12,76 @@ import {
   AlertCircle
 } from 'lucide-react'
 
-const activities = [
-  {
-    id: 1,
-    type: 'sale',
-    title: 'New sale completed',
-    description: 'Product XYZ sold to John Doe',
-    amount: 299.99,
-    time: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
-    status: 'completed'
-  },
-  {
-    id: 2,
-    type: 'customer',
-    title: 'New customer registered',
-    description: 'Jane Smith joined the platform',
-    time: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-    status: 'completed'
-  },
-  {
-    id: 3,
-    type: 'payment',
-    title: 'Payment received',
-    description: 'Invoice #1234 paid by ABC Corp',
-    amount: 1500.00,
-    time: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-    status: 'completed'
-  },
-  {
-    id: 4,
-    type: 'invoice',
-    title: 'Invoice generated',
-    description: 'New invoice #1235 for Tech Solutions',
-    amount: 2500.00,
-    time: new Date(Date.now() - 45 * 60 * 1000), // 45 minutes ago
-    status: 'pending'
-  },
-  {
-    id: 5,
-    type: 'alert',
-    title: 'Low stock alert',
-    description: 'Product ABC is running low on inventory',
-    time: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
-    status: 'warning'
-  }
-]
-
-const getActivityIcon = (type: string) => {
-  switch (type) {
-    case 'sale':
-      return <ShoppingCart className="h-4 w-4 text-green-600" />
-    case 'customer':
-      return <UserPlus className="h-4 w-4 text-blue-600" />
-    case 'payment':
-      return <CreditCard className="h-4 w-4 text-purple-600" />
-    case 'invoice':
-      return <FileText className="h-4 w-4 text-orange-600" />
-    case 'alert':
-      return <AlertCircle className="h-4 w-4 text-red-600" />
-    default:
-      return <TrendingUp className="h-4 w-4 text-gray-600" />
-  }
+interface RecentActivityProps {
+  sales?: any[]
 }
 
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'completed':
-      return <Badge variant="default" className="bg-green-100 text-green-800">Completed</Badge>
-    case 'pending':
-      return <Badge variant="secondary">Pending</Badge>
-    case 'warning':
-      return <Badge variant="destructive">Warning</Badge>
-    default:
-      return <Badge variant="outline">Unknown</Badge>
-  }
-}
+export function RecentActivity({ sales = [] }: RecentActivityProps) {
+  // Process sales data to create activity feed
+  const processActivities = () => {
+    if (!sales || sales.length === 0) {
+      return [
+        {
+          id: 1,
+          type: 'info',
+          title: 'No recent activity',
+          description: 'Start making sales to see activity here',
+          time: new Date(),
+          status: 'info'
+        }
+      ]
+    }
 
-export function RecentActivity() {
+    // Convert sales to activities
+    const salesActivities = sales.slice(0, 5).map((sale, index) => ({
+      id: `sale-${sale.id || index}`,
+      type: 'sale',
+      title: 'Sale completed',
+      description: `Sale #${sale.id || index + 1} - ${sale.customer?.name || 'Customer'} - ${sale.description || 'Product sold'}`,
+      amount: sale.amount || 0,
+      time: new Date(sale.saleDate || sale.dateCreated || Date.now()),
+      status: sale.status || 'completed'
+    }))
+
+    return salesActivities
+  }
+
+  const activities = processActivities()
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'sale':
+        return <ShoppingCart className="h-4 w-4 text-green-600" />
+      case 'customer':
+        return <UserPlus className="h-4 w-4 text-blue-600" />
+      case 'payment':
+        return <CreditCard className="h-4 w-4 text-purple-600" />
+      case 'invoice':
+        return <FileText className="h-4 w-4 text-orange-600" />
+      case 'alert':
+        return <AlertCircle className="h-4 w-4 text-red-600" />
+      case 'info':
+        return <TrendingUp className="h-4 w-4 text-gray-600" />
+      default:
+        return <TrendingUp className="h-4 w-4 text-gray-600" />
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge variant="default" className="bg-green-100 text-green-800">Completed</Badge>
+      case 'pending':
+        return <Badge variant="secondary">Pending</Badge>
+      case 'warning':
+        return <Badge variant="destructive">Warning</Badge>
+      case 'info':
+        return <Badge variant="outline" className="bg-gray-100 text-gray-600">Info</Badge>
+      default:
+        return <Badge variant="outline">Unknown</Badge>
+    }
+  }
+
   return (
     <Card className="col-span-3">
       <CardHeader>

@@ -16,33 +16,58 @@ public class InvoiceService
     // Get all invoices with customer information
     public async Task<List<Invoice>> GetInvoicesAsync()
     {
-        return await _context.Invoices
-            .Include(i => i.Customer)
-            .Include(i => i.Items)
-            .Include(i => i.Payments)
-            .OrderByDescending(i => i.InvoiceDate)
-            .ToListAsync();
+        try
+        {
+            return await _context.Invoices
+                .Include(i => i.Customer)
+                .Include(i => i.Items)
+                .Include(i => i.Payments)
+                .OrderByDescending(i => i.InvoiceDate)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            // Log the error and return empty list instead of crashing
+            Console.WriteLine($"Error fetching invoices: {ex.Message}");
+            return new List<Invoice>();
+        }
     }
 
     // Get invoice by ID with all related data
     public async Task<Invoice?> GetInvoiceByIdAsync(int id)
     {
-        return await _context.Invoices
-            .Include(i => i.Customer)
-            .Include(i => i.Items.OrderBy(item => item.SortOrder))
-            .Include(i => i.Payments.OrderBy(p => p.PaymentDate))
-            .FirstOrDefaultAsync(i => i.Id == id);
+        try
+        {
+            return await _context.Invoices
+                .Include(i => i.Customer)
+                .Include(i => i.Items.OrderBy(item => item.SortOrder))
+                .Include(i => i.Payments.OrderBy(p => p.PaymentDate))
+                .FirstOrDefaultAsync(i => i.Id == id);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching invoice by ID {id}: {ex.Message}");
+            return null;
+        }
     }
 
     // Get invoices for a specific customer
     public async Task<List<Invoice>> GetInvoicesByCustomerAsync(int customerId)
     {
-        return await _context.Invoices
-            .Include(i => i.Items)
-            .Include(i => i.Payments)
-            .Where(i => i.CustomerId == customerId)
-            .OrderByDescending(i => i.InvoiceDate)
-            .ToListAsync();
+        try
+        {
+            return await _context.Invoices
+                .Include(i => i.Items)
+                .Include(i => i.Payments)
+                .Where(i => i.CustomerId == customerId)
+                .OrderByDescending(i => i.InvoiceDate)
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching invoices for customer {customerId}: {ex.Message}");
+            return new List<Invoice>();
+        }
     }
 
     // Create new invoice
@@ -54,9 +79,22 @@ public class InvoiceService
             invoice.InvoiceNumber = await GenerateInvoiceNumberAsync();
         }
 
+        // Ensure all DateTime values are in UTC for PostgreSQL
+        invoice.InvoiceDate = DateTime.SpecifyKind(invoice.InvoiceDate, DateTimeKind.Utc);
+        invoice.DueDate = DateTime.SpecifyKind(invoice.DueDate, DateTimeKind.Utc);
+        invoice.CreatedAt = DateTime.UtcNow;
+        invoice.UpdatedAt = DateTime.UtcNow;
+        
+        // Set PaidDate to UTC if it exists
+        if (invoice.PaidDate.HasValue)
+        {
+            invoice.PaidDate = DateTime.SpecifyKind(invoice.PaidDate.Value, DateTimeKind.Utc);
+        }
+
         // Calculate totals
         CalculateInvoiceTotals(invoice);
 
+        // Entity Framework will automatically handle the relationship
         _context.Invoices.Add(invoice);
         await _context.SaveChangesAsync();
 
