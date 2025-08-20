@@ -1,0 +1,15 @@
+trigger:
+  - master
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- script: echo "Hello from Azure DevOps Pipeline"
+  displayName: 'Test Step'
+
+- script: echo "Current directory: $(pwd)"
+  displayName: 'Show Directory'
+
+- script: ls -la
+  displayName: 'List Files'
