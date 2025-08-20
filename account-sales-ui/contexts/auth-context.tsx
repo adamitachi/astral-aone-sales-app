@@ -116,16 +116,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Handle redirects in useEffect to avoid rendering during state updates
   useEffect(() => {
-    if (!isLoading && user !== null) { // Only redirect when we have a definitive auth state
+    if (!isLoading) { // Only redirect when we have a definitive auth state
       if (!isPublicRoute && !isAuthenticated) {
         console.log('Redirecting to login - not authenticated on protected route')
-        router.push('/login')
+        router.replace('/login')
       } else if (isPublicRoute && isAuthenticated) {
         console.log('Redirecting to dashboard - authenticated on public route')
-        router.push('/')
+        router.replace('/')
       }
     }
-  }, [isLoading, isPublicRoute, isAuthenticated, router, user])
+  }, [isLoading, isPublicRoute, isAuthenticated, router])
 
   // Don't render anything while checking auth - let AppLayout handle the loading state
   if (isLoading) {
@@ -134,7 +134,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // For protected routes, don't render if not authenticated (redirect will happen in useEffect)
   if (!isPublicRoute && !isAuthenticated) {
-    return null
+    // Show a loading state while redirecting to prevent blank page
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    )
   }
 
   return (

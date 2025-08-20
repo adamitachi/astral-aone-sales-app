@@ -12,10 +12,11 @@ const nextConfig: NextConfig = {
   // Only apply rewrites in production
   async rewrites() {
     if (process.env.NODE_ENV === 'production') {
+      const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:5086'
       return [
         {
           source: '/api/:path*',
-          destination: `${process.env.API_BASE_URL}/api/:path*`
+          destination: `${apiBaseUrl}/api/:path*`
         }
       ]
     }

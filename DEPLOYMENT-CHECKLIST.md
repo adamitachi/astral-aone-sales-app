@@ -1,70 +1,93 @@
-# ✅ Azure Deployment Checklist
+# Azure DevOps Deployment Checklist
 
-## 🏗️ Infrastructure Setup
-- [ ] Install Azure CLI
-- [ ] Login to Azure (`az login`)
-- [ ] Run deployment script (`.\deploy-to-azure.ps1`)
-- [ ] Verify resource group created
-- [ ] Verify App Service Plan (F1) created
-- [ ] Verify backend App Service created
-- [ ] Verify PostgreSQL database created
-- [ ] Verify Static Web App created
-- [ ] Note down all URLs and connection strings
+## Prerequisites
+- [ ] Azure subscription with App Service and Static Web Apps
+- [ ] Azure DevOps project with pipeline access
+- [ ] Resource group created in Azure
 
-## 🔧 Azure DevOps Setup
-- [ ] Create Azure DevOps organization
-- [ ] Create new project
-- [ ] Push code to Azure DevOps repository
-- [ ] Create Azure service connection
-- [ ] Create pipeline using `azure-pipelines.yml`
-- [ ] Configure pipeline variables
+## Step 1: Create Azure Service Connection
 
-## 🌐 Environment Configuration
-- [ ] Update backend App Service settings
-- [ ] Configure database connection string
-- [ ] Set CORS settings for frontend
-- [ ] Update frontend environment variables
-- [ ] Test backend connectivity
+1. **Go to Azure DevOps Project Settings**
+   - Navigate to your project
+   - Click **Project Settings** (bottom left)
+   - Select **Service Connections**
 
-## 🚀 Deployment
-- [ ] Run the pipeline
-- [ ] Monitor build process
-- [ ] Monitor deployment process
-- [ ] Verify backend deployment
-- [ ] Verify frontend deployment
-- [ ] Test application functionality
+2. **Create New Service Connection**
+   - Click **"New service connection"**
+   - Select **"Azure Resource Manager"**
+   - Choose **"Service principal (automatic)"**
+   - **Important**: Name it exactly `Azure-Subscription-Connection`
+   - Select your Azure subscription
+   - Select your resource group
+   - Click **Save**
 
-## 🧪 Testing
-- [ ] Test customer creation
-- [ ] Test invoice creation
-- [ ] Test database operations
-- [ ] Verify CORS working
-- [ ] Test all CRUD operations
-- [ ] Check error handling
+## Step 2: Set Up Pipeline Variables
 
-## 📊 Monitoring
-- [ ] Set up Application Insights
-- [ ] Configure logging
-- [ ] Set up alerts
-- [ ] Monitor performance
-- [ ] Check resource usage
+1. **Go to Pipelines → Library**
+   - Create a new **Variable Group** named `Deployment-Variables`
 
-## 🔒 Security
-- [ ] Verify HTTPS enabled
-- [ ] Check firewall rules
-- [ ] Review access controls
-- [ ] Test authentication (if implemented)
-- [ ] Verify data encryption
+2. **Add Required Variables**
+   - `AZURE_STATIC_WEB_APPS_API_TOKEN` - Get this from your Static Web App
+   - `AZURE_SUBSCRIPTION_ID` - Your Azure subscription ID
+   - `RESOURCE_GROUP_NAME` - Your Azure resource group name
 
-## 📚 Documentation
-- [ ] Update README with production URLs
-- [ ] Document deployment process
-- [ ] Create runbook for maintenance
-- [ ] Document troubleshooting steps
-- [ ] Update team documentation
+## Step 3: Create Azure Resources
 
----
+### Backend App Service
+1. **Create App Service Plan**
+   - Name: `astral-aone-backend-plan`
+   - OS: Windows
+   - Pricing tier: B1 (Basic) or higher
 
-**Status**: 🟡 In Progress  
-**Last Updated**: [Date]  
-**Next Review**: [Date + 1 week]
+2. **Create Web App**
+   - Name: `astral-aone-backend`
+   - Runtime stack: .NET 8
+   - Region: Same as your resource group
+
+### Frontend Static Web App
+1. **Create Static Web App**
+   - Name: `astral-aone-frontend`
+   - Region: Same as your resource group
+   - Build details: Skip for now (we'll deploy pre-built)
+
+## Step 4: Get Static Web Apps Token
+
+1. **In your Static Web App**
+   - Go to **Configuration** → **Deployment tokens**
+   - Copy the **deployment token**
+   - Add it to your pipeline variables as `AZURE_STATIC_WEB_APPS_API_TOKEN`
+
+## Step 5: Update Pipeline Variables
+
+1. **In your pipeline**
+   - Go to **Edit** → **Variables**
+   - Add the variable group you created
+   - Or add variables directly to the pipeline
+
+## Step 6: Test the Pipeline
+
+1. **Run the pipeline**
+   - It should now build successfully
+   - The deploy stage should work with the correct service connection
+
+## Troubleshooting
+
+### Common Issues:
+- **Service connection not found**: Make sure the name matches exactly
+- **Authorization failed**: Check if the service principal has proper permissions
+- **Build fails**: Check if all dependencies are properly referenced
+- **Deploy fails**: Verify the Azure resources exist and are accessible
+
+### Required Permissions:
+The service principal needs these roles:
+- **Contributor** on the resource group
+- **Web Plan Contributor** for App Service
+- **Static Web App Contributor** for Static Web Apps
+
+## Next Steps After Deployment
+
+1. **Configure CORS** in your backend for the frontend domain
+2. **Set up custom domains** if needed
+3. **Configure SSL certificates**
+4. **Set up monitoring and logging**
+5. **Configure CI/CD triggers** (branch policies, etc.)
