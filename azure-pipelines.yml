@@ -1,3 +1,5 @@
+# Azure DevOps Pipeline - Using GitHub as Source
+# This pipeline pulls code from GitHub repository
 trigger:
   - master
 
