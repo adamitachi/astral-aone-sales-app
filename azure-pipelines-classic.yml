@@ -1,0 +1,47 @@
+# Classic Azure DevOps Pipeline Format
+# This mimics the old pipeline format to avoid YAML template issues
+trigger:
+  - master
+
+# Use the most basic structure possible
+pool:
+  vmImage: 'ubuntu-latest'
+
+# Single stage with minimal configuration
+stages:
+- stage: Build
+  displayName: 'Build'
+  jobs:
+  - job: BuildJob
+    displayName: 'Build Job'
+    steps:
+    # Try using the old checkout syntax
+    - checkout: self
+      clean: false
+      fetchDepth: 1
+      persistCredentials: false
+    
+    - task: UseDotNet@2
+      inputs:
+        version: '8.0.x'
+        includePreviewVersions: false
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Build'
+      inputs:
+        command: 'build'
+        projects: '**/*.sln'
+        arguments: '--configuration Release'
+    
+    - task: DotNetCoreCLI@2
+      displayName: 'Publish'
+      inputs:
+        command: 'publish'
+        projects: 'AccountSalesApp.WebApp/AccountSalesApp.WebApp.csproj'
+        arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)/backend'
+        zipAfterPublish: true
+    
+    - task: PublishBuildArtifacts@1
+      inputs:
+        pathToPublish: '$(Build.ArtifactStagingDirectory)/backend'
+        artifactName: 'backend'
